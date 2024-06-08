@@ -14,6 +14,7 @@ n_head = 4
 n_layers = 4
 dropout = 0.1
 
+print(f"Using {device}")
 
 # ----------------- Data Preprocessing ----------------- #
 torch.manual_seed(1337)
@@ -91,8 +92,6 @@ class Head(nn.Module):
     # Perform the weighted aggregation of the values
     v = self.value(x) # (B, T, C)
     out = wei @ v # (B,T, T) @ (B, T, C) -> (B, T, C)
-
-    
 
     return out
 
