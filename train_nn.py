@@ -6,9 +6,11 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from utils import interpolate_weights, save_checkpoint, load_checkpoint
 import copy
+
+experiment = "MNIST_Lenet"
 # ----------------- Hyperparameters ----------------- #
 lr = 12e-4
-max_iter = 3000
+max_iter = 24000
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 batch_size = 60
 eval_iter = 50
@@ -109,15 +111,38 @@ save_checkpoint(model1, curr_iter, 'MNIST_Lenet/model1')
 save_checkpoint(model2, curr_iter, 'MNIST_Lenet/model2')
 
 
-state_dict1 = model1.state_dict()
-state_dict2 = model2.state_dict()
-
 interpolated_model = interpolate_weights(model1, model2, MNIST_Lenet(), 0.5, device=device)
 print(f"Interpolated Model Accuracy: {estimate_loss(interpolated_model, 'eval', metric='accuracy')}")
 
 
+# Interpolation
+res = 30
 
+alphas = torch.linspace(0, 1, res)
+error_rates = torch.zeros((2, res))
 
+for i, alpha in enumerate(alphas):
+    interpolated_model = interpolate_weights(model1, model2, MNIST_Lenet(), alpha, device=device)
+    acc = estimate_loss(interpolated_model, 'eval', metric='accuracy')
+    error_rates[0, i] = 1 - acc
+    acc = estimate_loss(interpolated_model, 'train', metric='accuracy')
+    error_rates[1, i] = 1 - acc
 
+error_rates *= 100
+
+import matplotlib.pyplot as plt
+plt.plot(alphas, error_rates[0, :], 'r') # Eval
+plt.plot(alphas, error_rates[1, :], 'b') # Train
+plt.xlabel('Interpolation')
+plt.ylabel('Error (%)')
+plt.ylim(0, 100)
+plt.title(experiment)
+
+plt.grid(True)  # Enable both major and minor grid lines
+plt.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+plt.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
+
+plt.show()
+plt.savefig('MNIST_Lenet/interpolation.png')
 
 

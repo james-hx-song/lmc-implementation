@@ -18,6 +18,8 @@ def interpolate_weights(model1, model2, baseline, alpha, device='cuda'):
     return interpolated_model
 
 def save_checkpoint(model, epoch, checkpoint_dir, optimizer=None):
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
     checkpoint = {
         'model': model.state_dict(),
         'epoch': epoch,
