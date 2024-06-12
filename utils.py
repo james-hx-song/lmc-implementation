@@ -4,8 +4,14 @@ import os
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+def get_vocab_size(filename='input.txt'):
+    with open(filename, 'r') as f:
+        text = f.read()
+    chars = sorted(list(set(text)))
+    vocab_size = len(chars)
+    return vocab_size
 
-def interpolate_weights(model1, model2, baseline, alpha, device='cuda'):
+def interpolate_weights(model1, model2, baseline, alpha, device='cpu'):
     interpolated_model = baseline.to(device)
     state_dict1 = model1.state_dict()
     state_dict2 = model2.state_dict()
