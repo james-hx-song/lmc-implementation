@@ -8,8 +8,9 @@
             "name": "adam",
             "lr": 12e-4
         },
+        "variant": null,
         "scheduler": null,
-        "iterations": 5e3
+        "iterations": 24e3
     },
     {
         "name": "CIFAR_Resnet20",
@@ -19,6 +20,11 @@
         "optimizer": {
             "name": "sgd",
             "lr": 1e-1
+        },
+        "variant": "standard",
+        "scheduler":{
+            "milestones": [32000, 48000],
+            "gamma": 0.1
         },
         "iterations": 5e3
     }

@@ -1,6 +1,7 @@
 import torch
 import os
 import json
+from torch.optim.lr_scheduler import MultiStepLR, LambdaLR
 
 import datasets.MNIST
 import datasets.CIFAR10
@@ -8,6 +9,9 @@ import models.GPT
 import models.Lenet
 import models.Resnet
 
+class NoOpScheduler:
+    def step(self):
+        pass
 def get_hyperparams(experiment_name, config_file = "config.json"):
     with open(config_file, 'r') as f:
         configs = json.load(f)
@@ -16,10 +20,24 @@ def get_hyperparams(experiment_name, config_file = "config.json"):
             config["model"] = get_model(config["model"])
             config["optimizer"] = get_optimizer(config["optimizer"]['name'], config["model"], config["optimizer"]["lr"])
             config["data_loader"] = get_loader(config["data_loader"], config["batch_size"])
+            if config["scheduler"] is not None:
+                if config["variant"] == "standard":
+                    config["scheduler"] = MultiStepLR(config["optimizer"], milestones=config["scheduler"]["milestones"], gamma=config["scheduler"]["gamma"])
+                elif config["variant"] == "low":
+                    config["scheduler"] = NoOpScheduler()
+                elif config["variant"] == "warmup":
+                    config["scheduler"] = get_warmup_scheduler(config["optimizer"], num_warmup_steps=config["scheduler"]["num_warmup_steps"])
+
             break
 
     return config
-
+def get_warmup_scheduler(optimizer, num_warmup_steps=30000):
+    def lr_lambda(current_step):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        return 1.0
+    scheduler = LambdaLR(optimizer, lr_lambda)
+    return scheduler
 def get_model(model_name):
     if model_name == 'GPT':
         return models.GPT.BigramLanguageModel()
