@@ -51,7 +51,7 @@ class Resnet(nn.Module):
             self.in_features = out_channels
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, target=None):
         x = F.relu(self.conv1(x))
         x = self.layer1(x)
         x = self.layer2(x)
@@ -60,7 +60,11 @@ class Resnet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         x = F.softmax(x, dim=1)
-        return x
+
+        if target is not None:
+            loss = F.cross_entropy(x, target)
+            return x, loss
+        return x, None
 
 
 def Resnet20():

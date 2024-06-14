@@ -79,7 +79,7 @@ class Block(nn.Module):
 
 class BigramLanguageModel(nn.Module):
 
-  def __init__(self, n_embed=32, block_size=8, n_head=4, n_layers=4, dropout=0.1, device='cpu', vocab_size=0) -> None:
+  def __init__(self, vocab_size, n_embed=32, block_size=8, n_head=4, n_layers=4, dropout=0.1, device='cpu') -> None:
     super().__init__()
     self.block_size = block_size
     self.device = device

@@ -1,5 +1,72 @@
 import torch
 import os
+import json
+
+import datasets.MNIST
+import datasets.CIFAR10
+import models.GPT
+import models.Lenet
+import models.Resnet
+
+def get_hyperparams(experiment_name, config_file = "config.json"):
+    with open(config_file, 'r') as f:
+        configs = json.load(f)
+    for config in configs:
+        if config["name"] == experiment_name:
+            config["model"] = get_model(config["model"])
+            config["optimizer"] = get_optimizer(config["optimizer"]['name'], config["model"], config["optimizer"]["lr"])
+            config["data_loader"] = get_loader(config["data_loader"], config["batch_size"])
+            break
+
+    return config
+
+def get_model(model_name):
+    if model_name == 'GPT':
+        return models.GPT.BigramLanguageModel()
+    elif model_name == "Lenet":
+        return models.Lenet.MNIST_Lenet()
+    elif model_name == "Resnet20":
+        return models.Resnet.Resnet20()
+    
+    print(f"Model not found: {model_name}")
+    raise ValueError("Model not found")
+
+def get_optimizer(optimizer_name, model, lr):
+    if optimizer_name == 'adam':
+        return torch.optim.Adam(model.parameters(), lr=lr)
+    elif optimizer_name == 'sgd':
+        return torch.optim.SGD(model.parameters(), lr=lr)
+    
+    print(f"Optimizer not found: {optimizer_name}")
+    raise ValueError("Optimizer not found")
+
+def get_loader(data_loader_name, batch_size):
+    if data_loader_name == 'MNIST':
+        return datasets.MNIST.MNISTDataLoader(batch_size)
+    elif data_loader_name== 'CIFAR10':
+        return datasets.CIFAR10.CIFAR10DataLoader(batch_size)
+    
+    print(f"Data Loader not found: {data_loader_name}")
+    raise ValueError("Data Loader not found")
+
+@torch.no_grad()
+def estimate_loss(model, dataloader, eval_iter, device='cpu', mode='eval', copy=False, metric='cross_entropy'):
+    model.eval()
+    losses = torch.zeros(eval_iter)
+    for i, (img, target) in enumerate(dataloader):
+        if i >= eval_iter:
+            break
+        img = img.to(device)
+        logits, loss = model(img, target)
+        if metric == 'cross_entropy':
+            losses[i] = loss.item()
+        elif metric == 'accuracy':
+            pred = logits.argmax(dim=1)
+            acc = (pred == target).float().mean()
+            losses[i] = acc.item()
+        
+    model.train()
+    return losses.mean()
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

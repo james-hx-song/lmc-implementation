@@ -1,0 +1,25 @@
+[
+    {
+        "name": "MNIST_Lenet",
+        "model": "Lenet",
+        "data_loader": "MNIST",
+        "batch_size": 60,
+        "optimizer": {
+            "name": "adam",
+            "lr": 12e-4
+        },
+        "scheduler": null,
+        "iterations": 5e3
+    },
+    {
+        "name": "CIFAR_Resnet20",
+        "model": "Resnet20",
+        "data_loader": "CIFAR10",
+        "batch_size": 128,
+        "optimizer": {
+            "name": "sgd",
+            "lr": 1e-1
+        },
+        "iterations": 5e3
+    }
+]
