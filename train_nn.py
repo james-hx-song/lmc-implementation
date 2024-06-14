@@ -16,7 +16,6 @@ batch_size = 60
 eval_iter = 50
 
 
-
 # ----------------- Training Loop ----------------- #
 def mnist_data_loader(batch_size):
     # Transform to convert images to PyTorch tensors and normalize them

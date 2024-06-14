@@ -50,7 +50,7 @@ def get_loader(data_loader_name, batch_size):
     raise ValueError("Data Loader not found")
 
 @torch.no_grad()
-def estimate_loss(model, dataloader, eval_iter, device='cpu', mode='eval', copy=False, metric='cross_entropy'):
+def estimate_loss(model, dataloader, eval_iter, device='cpu', metric='cross_entropy'):
     model.eval()
     losses = torch.zeros(eval_iter)
     for i, (img, target) in enumerate(dataloader):
@@ -66,7 +66,7 @@ def estimate_loss(model, dataloader, eval_iter, device='cpu', mode='eval', copy=
             losses[i] = acc.item()
         
     model.train()
-    return losses.mean()
+    return losses.mean().item()
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
