@@ -95,7 +95,7 @@ class BigramLanguageModel(nn.Module):
     # self.ffn = FFN(n_embed)
     self.lm_head = nn.Linear(n_embed, vocab_size)
 
-  def forward(self, idx, targets=None):
+  def forward(self, idx, target=None):
     B, T = idx.shape
     token_embeddings = self.token_embedding_table(idx) # (B, T, C=n_embed)
     position_embeddings = self.position_embedding_table(torch.arange(T, device=self.device)) # (T, C=n_embed)
@@ -104,15 +104,15 @@ class BigramLanguageModel(nn.Module):
     # x = self.ffn(x)
     x = self.blocks(x)
     logits = self.lm_head(x)
-    if targets is None:
+    if target is None:
       loss = None
     else:
        # Note that this is Batch X Time X Channels
       B, T, C = logits.shape
       # Negative Log Likelihood Loss
       logits = logits.view(B*T, C)
-      targets = targets.view(B*T)
-      loss = F.cross_entropy(logits, targets) # Entropy wants it to be batch X time X channels
+      target = target.view(B*T)
+      loss = F.cross_entropy(logits, target) # Entropy wants it to be batch X time X channels
     return logits, loss
 
   def generate(self, idx, max_new_tokens):

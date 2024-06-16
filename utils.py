@@ -5,6 +5,7 @@ from torch.optim.lr_scheduler import MultiStepLR, LambdaLR
 
 import datasets.MNIST
 import datasets.CIFAR10
+import datasets.Langdata
 import models.GPT
 import models.Lenet
 import models.Resnet
@@ -17,17 +18,28 @@ def get_hyperparams(experiment_name, config_file = "config.json"):
         configs = json.load(f)
     for config in configs:
         if config["name"] == experiment_name:
-            config["model"] = get_model(config["model"])
+            vocab_size = None
+            block_size, n, input_file = None, None, None
+            if "block_size" in config:
+                block_size = config["block_size"]
+                n = config["n"]
+                input_file = config["input_file"]
+                vocab_size = get_vocab_size(input_file)
+
+                        
+            config["model"] = get_model(config["model"], vocab_size=vocab_size, block_size=block_size)
             config["optimizer"] = get_optimizer(config["optimizer"]['name'], config["model"], config["optimizer"]["lr"])
-            config["data_loader"] = get_loader(config["data_loader"], config["batch_size"])
+
+            config["data_loader"] = get_loader(config["data_loader"], config["batch_size"], block_size=block_size, n=n, input_file=input_file)
             if config["scheduler"] is not None:
                 if config["variant"] == "standard":
                     config["scheduler"] = MultiStepLR(config["optimizer"], milestones=config["scheduler"]["milestones"], gamma=config["scheduler"]["gamma"])
                 elif config["variant"] == "low":
                     config["scheduler"] = NoOpScheduler()
                 elif config["variant"] == "warmup":
-                    config["scheduler"] = get_warmup_scheduler(config["optimizer"], num_warmup_steps=config["scheduler"]["num_warmup_steps"])
-
+                    config["scheduler"] = get_warmup_scheduler(config["optimizer"], num_warmup_steps=config["scheduler"]["warmup_steps"])
+            else:
+                config["scheduler"] = NoOpScheduler()
             break
 
     return config
@@ -38,9 +50,11 @@ def get_warmup_scheduler(optimizer, num_warmup_steps=30000):
         return 1.0
     scheduler = LambdaLR(optimizer, lr_lambda)
     return scheduler
-def get_model(model_name):
+def get_model(model_name, vocab_size=None, **kwargs):
     if model_name == 'GPT':
-        return models.GPT.BigramLanguageModel()
+        if vocab_size is None:
+            raise ValueError("Vocab size required for GPT model")
+        return models.GPT.BigramLanguageModel(vocab_size, block_size=kwargs["block_size"])
     elif model_name == "Lenet":
         return models.Lenet.MNIST_Lenet()
     elif model_name == "Resnet20":
@@ -58,11 +72,13 @@ def get_optimizer(optimizer_name, model, lr):
     print(f"Optimizer not found: {optimizer_name}")
     raise ValueError("Optimizer not found")
 
-def get_loader(data_loader_name, batch_size):
+def get_loader(data_loader_name, batch_size, **kwargs):
     if data_loader_name == 'MNIST':
         return datasets.MNIST.MNISTDataLoader(batch_size)
     elif data_loader_name== 'CIFAR10':
         return datasets.CIFAR10.CIFAR10DataLoader(batch_size)
+    elif data_loader_name == 'Lang':
+        return datasets.Langdata.LangDataLoader(batch_size, kwargs["block_size"], kwargs["n"], kwargs["input_file"])
     
     print(f"Data Loader not found: {data_loader_name}")
     raise ValueError("Data Loader not found")
