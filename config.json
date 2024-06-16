@@ -39,7 +39,7 @@
         },
         "variant": "standard",
         "scheduler": null,
-        "iterations": 1e3,
+        "iterations": 25e3,
         "block_size": 8,
         "n": 0.9,
         "input_file": "input.txt"

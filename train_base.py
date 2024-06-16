@@ -1,7 +1,8 @@
 import torch
 import copy
 import matplotlib.pyplot as plt
-from utils import get_hyperparams, estimate_loss, interpolate_weights
+from utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint
+import os
 
 experiment = "MinGPT_Shakespeare"
 
@@ -35,38 +36,51 @@ scheduler2 = config['scheduler']
 
 # ----------------- Training Loop ----------------- #
 
-curr_iter = 0
+def train():
+    curr_iter = 0
+    torch.autograd.set_detect_anomaly(True)
+    while curr_iter < max_iter:
+        for (img, target), (img2, target2) in zip(train_loader, train_loader2):
+            # print(curr_iter)
+            img = img.to(device)
+            img2 = img2.to(device)
 
-torch.autograd.set_detect_anomaly(True)
-while curr_iter < max_iter:
-    for (img, target), (img2, target2) in zip(train_loader, train_loader2):
-        # print(curr_iter)
-        img = img.to(device)
-        img2 = img2.to(device)
+            # Forward Pass
+            logits, loss = model1(img, target=target)
+            optimizer1.zero_grad(set_to_none=True)
+            
+            logits2, loss2 = model2(img2, target=target2)
+            optimizer2.zero_grad(set_to_none=True)
 
-        # Forward Pass
-        logits, loss = model1(img, target=target)
-        optimizer1.zero_grad(set_to_none=True)
-        
-        logits2, loss2 = model2(img2, target=target2)
-        optimizer2.zero_grad(set_to_none=True)
+            # Backward Pass
+            loss.backward()
+            optimizer1.step()
 
-        # Backward Pass
-        loss.backward()
-        optimizer1.step()
+            loss2.backward()
+            optimizer2.step()
 
-        loss2.backward()
-        optimizer2.step()
+            # Display Error
+            if curr_iter % 100 == 0:
+                print(f"Iter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
+                print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
+            curr_iter += 1
+            if curr_iter >= max_iter:
+                break
+        scheduler1.step()
+        scheduler2.step()
 
-        # Display Error
-        if curr_iter % 100 == 0:
-            print(f"Iter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
-            print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
-        curr_iter += 1
-        if curr_iter >= max_iter:
-            break
-    scheduler1.step()
-    scheduler2.step()
+# ----------------- Checkpointing ----------------- #
+user_input = input("Do you want to load checkpoints? (y/n): ")
+if not os.path.isdir(experiment) or not os.listdir(experiment) or user_input == 'n':
+    train()
+    save_checkpoint(model1, max_iter, experiment + '/model1')
+    save_checkpoint(model2, max_iter, experiment + '/model2')
+else:
+    print("Loading Checkpoints")
+    model1, optimizer1 = load_checkpoint(model1, experiment + '/model1')
+    model2, optimizer2 = load_checkpoint(model2, experiment + '/model2')
+
+# ----------------- Save Model ----------------- #
 
 
 # ----------------- Linear Interpolation ----------------- #
@@ -96,5 +110,6 @@ plt.title(experiment)
 plt.grid(True)  # Enable both major and minor grid lines
 plt.grid(which='major', linestyle='-', linewidth='0.5', color='black')
 plt.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
+plt.savefig(f"{experiment}_interpolation.png")
 plt.show()
 

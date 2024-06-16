@@ -166,3 +166,6 @@ data/
 
 # Checkpoints
 MNIST_Lenet/
+
+# Graphs
+*.png

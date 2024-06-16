@@ -95,10 +95,9 @@ def estimate_loss(model, dataloader, eval_iter, device='cpu', metric='cross_entr
         if metric == 'cross_entropy':
             losses[i] = loss.item()
         elif metric == 'accuracy':
-            pred = logits.argmax(dim=1)
+            pred = logits.argmax(dim=-1)
             acc = (pred == target).float().mean()
             losses[i] = acc.item()
-        
     model.train()
     return losses.mean().item()
 

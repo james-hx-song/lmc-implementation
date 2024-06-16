@@ -110,9 +110,9 @@ class BigramLanguageModel(nn.Module):
        # Note that this is Batch X Time X Channels
       B, T, C = logits.shape
       # Negative Log Likelihood Loss
-      logits = logits.view(B*T, C)
+      pred = logits.view(B*T, C)
       target = target.view(B*T)
-      loss = F.cross_entropy(logits, target) # Entropy wants it to be batch X time X channels
+      loss = F.cross_entropy(pred, target) # Entropy wants it to be batch X time X channels
     return logits, loss
 
   def generate(self, idx, max_new_tokens):
@@ -129,3 +129,9 @@ class BigramLanguageModel(nn.Module):
       idx_next = torch.multinomial(probs, num_samples=1)
       idx = torch.cat((idx, idx_next), dim=1)
     return idx
+
+if __name__ == "__main__":
+  with open("input.txt", 'r') as f:
+    text = f.read()
+  vocab = list(set(text))
+  print(f"Bigram Language Model has {sum(p.numel() for p in BigramLanguageModel(len(vocab)).parameters() if p.requires_grad)} parameters.")
