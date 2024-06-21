@@ -10,7 +10,7 @@ experiment = "MinGPT_Shakespeare"
 
 config = get_hyperparams(experiment)
 max_iter = config['iterations']
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = config['batch_size']
 eval_iter = 50
 

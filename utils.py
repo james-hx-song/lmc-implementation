@@ -19,17 +19,17 @@ def get_hyperparams(experiment_name, config_file = "config.json"):
     for config in configs:
         if config["name"] == experiment_name:
             vocab_size = None
-            block_size, n, input_file = None, None, None
-            if "block_size" in config:
-                block_size = config["block_size"]
+            GPT_Params, n, input_file, block_size = None, None, None, None
+            if "GPT_params" in config:
+                GPT_Params = config["GPT_params"]
+                block_size = GPT_Params["block_size"]
                 n = config["n"]
                 input_file = config["input_file"]
                 vocab_size = get_vocab_size(input_file)
 
                         
-            config["model"] = get_model(config["model"], vocab_size=vocab_size, block_size=block_size)
+            config["model"] = get_model(config["model"], vocab_size, **GPT_Params)
             config["optimizer"] = get_optimizer(config["optimizer"]['name'], config["model"], config["optimizer"]["lr"])
-
             config["data_loader"] = get_loader(config["data_loader"], config["batch_size"], block_size=block_size, n=n, input_file=input_file)
             if config["scheduler"] is not None:
                 if config["variant"] == "standard":
@@ -54,7 +54,7 @@ def get_model(model_name, vocab_size=None, **kwargs):
     if model_name == 'GPT':
         if vocab_size is None:
             raise ValueError("Vocab size required for GPT model")
-        return models.GPT.BigramLanguageModel(vocab_size, block_size=kwargs["block_size"])
+        return models.GPT.BigramLanguageModel(vocab_size, **kwargs)
     elif model_name == "Lenet":
         return models.Lenet.MNIST_Lenet()
     elif model_name == "Resnet20":

@@ -166,6 +166,7 @@ data/
 
 # Checkpoints
 MNIST_Lenet/
+MinGPT_Shakespeare/
 
 # Graphs
 *.png

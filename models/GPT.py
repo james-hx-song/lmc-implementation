@@ -79,21 +79,26 @@ class Block(nn.Module):
 
 class BigramLanguageModel(nn.Module):
 
-  def __init__(self, vocab_size, n_embed=32, block_size=8, n_head=4, n_layers=4, dropout=0.1, device='cpu') -> None:
+  def __init__(self, vocab_size, **kwargs) -> None:
     super().__init__()
-    self.block_size = block_size
-    self.device = device
-    self.token_embedding_table = nn.Embedding(vocab_size, n_embed)
+    self.vocab_size = vocab_size
+    self.n_embed = kwargs.get('n_embed', 32)
+    self.block_size = kwargs.get('block_size', 8)
+    self.n_head = kwargs.get('n_head', 4)
+    self.n_layers = kwargs.get('n_layers', 4)
+    self.dropout = kwargs.get('dropout', 0.1)
+    self.device = kwargs.get('device', 'cpu')
 
+    self.token_embedding_table = nn.Embedding(vocab_size, self.n_embed)
     # positional embedding
-    self.position_embedding_table = nn.Embedding(block_size, n_embed) # each position of 0 to block_size-1 will also be embedded
-    self.blocks = nn.Sequential(*[Block(n_embed, n_head=n_head, block_size=block_size, dropout=dropout) for _ in range(n_layers)])
+    self.position_embedding_table = nn.Embedding(self.block_size, self.n_embed) # each position of 0 to block_size-1 will also be embedded
+    self.blocks = nn.Sequential(*[Block(self.n_embed, n_head=self.n_head, block_size=self.block_size, dropout=self.dropout) for _ in range(self.n_layers)])
     # self.lm_head = nn.Linear(n_embed, vocab_size)
     # # self.sa_head = Head(n_embed) # Self Attention Head
     # self.sa_heads = MultiHeadAttention(4, n_embed//4)
     # # FFN
     # self.ffn = FFN(n_embed)
-    self.lm_head = nn.Linear(n_embed, vocab_size)
+    self.lm_head = nn.Linear(self.n_embed, vocab_size)
 
   def forward(self, idx, target=None):
     B, T = idx.shape

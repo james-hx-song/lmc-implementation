@@ -40,7 +40,9 @@
         "variant": "standard",
         "scheduler": null,
         "iterations": 25e3,
-        "block_size": 8,
+        "GPT_params": {
+            "block_size": 8
+        },
         "n": 0.9,
         "input_file": "input.txt"
     }
