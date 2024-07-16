@@ -1,4 +1,6 @@
-torch
-numpy
-torchvision
-matplotlib
+torch==2.3.1
+torchvision==0.18.1
+numpy==1.26.4
+matplotlib==3.9.0
+tiktoken==0.7.0
+transformers==4.42.4
