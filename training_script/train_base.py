@@ -1,7 +1,7 @@
 import torch
 import copy
 import matplotlib.pyplot as plt
-from utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint
+from training_script.utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint
 import os
 
 experiment = "MinGPT_Shakespeare"

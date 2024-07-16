@@ -4,7 +4,7 @@ import torch.nn as nn
 from models.Lenet import MNIST_Lenet
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from utils import interpolate_weights, save_checkpoint, load_checkpoint
+from training_script.utils import interpolate_weights, save_checkpoint, load_checkpoint
 import copy
 
 experiment = "MNIST_Lenet"
