@@ -52,9 +52,14 @@ def get_warmup_scheduler(optimizer, num_warmup_steps=30000):
     return scheduler
 def get_model(model_name, vocab_size=None, **kwargs):
     if model_name == 'GPT':
+        device = 'cpu'
+        if torch.cuda.is_available():
+            device = 'cuda'
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            device = 'mps'
         if vocab_size is None:
             raise ValueError("Vocab size required for GPT model")
-        return models.GPT.BigramLanguageModel(vocab_size, **kwargs)
+        return models.GPT.BigramLanguageModel(vocab_size, device=device, **kwargs)
     elif model_name == "Lenet":
         return models.Lenet.MNIST_Lenet()
     elif model_name == "Resnet20":
@@ -86,11 +91,12 @@ def get_loader(data_loader_name, batch_size, **kwargs):
 @torch.no_grad()
 def estimate_loss(model, dataloader, eval_iter, device='cpu', metric='cross_entropy'):
     model.eval()
-    losses = torch.zeros(eval_iter)
+    losses = torch.zeros(eval_iter, device=device)
     for i, (img, target) in enumerate(dataloader):
         if i >= eval_iter:
             break
         img = img.to(device)
+        target = target.to(device)
         logits, loss = model(img, target)
         if metric == 'cross_entropy':
             losses[i] = loss.item()

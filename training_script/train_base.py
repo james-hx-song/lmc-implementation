@@ -10,10 +10,16 @@ experiment = "MinGPT_Shakespeare"
 
 config = get_hyperparams(experiment)
 max_iter = config['iterations']
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = config['batch_size']
 eval_iter = 50
 
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
+elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    device = 'mps'
+
+print(f"Device: {device}")
 # -----------------  Necessary Components: Models, Loaders, Optimizers ----------------- #
 
 model1, optimizer1 = config['model'], config['optimizer']
@@ -23,7 +29,7 @@ train_loader, test_loader = data_loader.get_train_loader(), data_loader.get_test
 baseline = copy.deepcopy(model1)
 scheduler1 = config['scheduler']
 
-print(f"Baseline is {type(baseline)}")
+print(f"Baseline is {type(baseline)}, with {sum(p.numel() for p in baseline.parameters() if p.requires_grad)} parameters.")
 
 config = get_hyperparams(experiment)
 data_loader2 = config['data_loader']
@@ -44,6 +50,8 @@ def train():
             # print(curr_iter)
             img = img.to(device)
             img2 = img2.to(device)
+            target = target.to(device)
+            target2 = target2.to(device)
 
             # Forward Pass
             logits, loss = model1(img, target=target)
