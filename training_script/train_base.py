@@ -1,4 +1,5 @@
 import torch
+import time
 import copy
 import matplotlib.pyplot as plt
 from training_script.utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint
@@ -52,7 +53,7 @@ def train():
             img2 = img2.to(device)
             target = target.to(device)
             target2 = target2.to(device)
-
+            t0 = time.time()
             # Forward Pass
             logits, loss = model1(img, target=target)
             optimizer1.zero_grad(set_to_none=True)
@@ -66,11 +67,12 @@ def train():
 
             loss2.backward()
             optimizer2.step()
+            t1 = time.time()
 
             # Display Error
-            if curr_iter % 100 == 0:
-                print(f"Iter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
-                print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
+            print(f"Iter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
+            print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
+            print(f"Time taken: {t1 - t0}\n")
             curr_iter += 1
             if curr_iter >= max_iter:
                 break
