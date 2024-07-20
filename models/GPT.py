@@ -48,12 +48,23 @@ class Attention(nn.Module):
         # Concatenate the heads
         attn_vec = attn_vec.transpose(1, 2).contiguous().view(B, T, C) # (B, T, C)
 
-        out = self.c_proj(attn_vec) # (B, T, C
+        out = self.c_proj(attn_vec) # (B, T, C)
 
         return out
 
-        
+class MLP(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.c_fc = nn.Linear(config.n_embed, config.n_embed*4) # Both Vaswani eta al. and GPT-2 use 4x
+        self.c_proj = nn.Linear(config.n_embed*4, config.n_embed)
 
+        # GPT-2 uses GELU; Vaswani et al. uses ReLU
+        self.gelu = nn.GELU()
+
+    def forward(self, x):
+        x = self.gelu(self.c_fc(x))
+        x = self.c_proj(x)
+        return x
 
 class Block(nn.Module):
     def __init__(self, config):
@@ -61,6 +72,13 @@ class Block(nn.Module):
         self.ln_1 = nn.LayerNorm(config.n_embed)
         self.ln_2 = nn.LayerNorm(config.n_embed)
         self.attn = Attention(config)
+        self.mlp = MLP(config)
+
+    def forward(self, x):
+        # Vaswani et al. use LayerNorm(x + Attention(LayerNorm(x)))
+        x = x + self.attn(self.ln_1(x)) # Residual Connection
+        x = x + self.mlp(self.ln_2(x))
+        return x
 
 
 class GPT(nn.Module):
@@ -72,18 +90,39 @@ class GPT(nn.Module):
             dict(
                 wte = nn.Embedding(config.vocab_size, config.n_embed), #  Token Embeddings
                 wpe = nn.Embedding(config.block_size, config.n_embed), #  Positional Embeddings
-                h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]) # Transformer Blocks
+                h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]), # Transformer Blocks
+                ln_f = nn.LayerNorm(config.n_embed) # Layer Norm
             )
         )
 
         self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
 
+    def forward(self, x, y=None):
+        # Token + Position
+        x = self.transformer.wte(x) + self.transformer.wpe(torch.arange(x.size(1), device=x.device))
 
-
+        # Transformer Blocks
+        for block in self.transformer.h:
+            x = block(x)
         
+        # According to GPT 2 repo, they add layer norm at the end
+        x = self.transformer.ln_f(x)
+
+        logits = self.lm_head(x)
+        loss = None
+        if y is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1))
+        return logits, loss
+
 
 if __name__ == '__main__':
     model = GPT(GPT2Config())
     
-    for k, v in model.state_dict().items():
-        print(k, v.shape)
+    # for k, v in model.state_dict().items():
+    #     print(k, v.shape)
+
+    x = torch.randint(0, 50257, (2, 1024))
+    y = torch.randint(0, 50257, (2, 1024))
+    # print(x.shape, y.shape)
+    logits, loss = model(x, y)
+    print(logits.shape, loss.item())
