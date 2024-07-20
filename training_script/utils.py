@@ -1,92 +1,40 @@
 import torch
 import os
 import json
-from torch.optim.lr_scheduler import MultiStepLR, LambdaLR
+import matplotlib.pyplot as plt
 
-import datasets.MNIST
-import datasets.CIFAR10
-import datasets.Langdata
-import models.GPT
-import models.Lenet
-import models.Resnet
+from datasets import CIFAR10, MNIST, Langdata
+import config.Exp_Config as config
+from scheduler.scheduler import LRScheduler
 
-class NoOpScheduler:
-    def step(self):
-        pass
-def get_hyperparams(experiment_name, config_file = "config.json"):
-    with open(config_file, 'r') as f:
-        configs = json.load(f)
-    for config in configs:
-        if config["name"] == experiment_name:
-            vocab_size = None
-            GPT_Params, n, input_file, block_size = None, None, None, None
-            if "GPT_params" in config:
-                GPT_Params = config["GPT_params"]
-                block_size = GPT_Params["block_size"]
-                n = config["n"]
-                input_file = config["input_file"]
-                vocab_size = get_vocab_size(input_file)
+config_dict = dict(
+    mnist_lenet=config.LeNetConfig(),
+    cifar_resnet=config.ResNet20ConfigStandard(),
+    cifar_resnet_warmup=config.ResNet20ConfigWarmup(),
+    cifar_resnet_low=config.ResNet20ConfigLow()
+)
 
-                        
-            config["model"] = get_model(config["model"], vocab_size, **GPT_Params)
-            config["optimizer"] = get_optimizer(config["optimizer"]['name'], config["model"], config["optimizer"]["lr"])
-            config["data_loader"] = get_loader(config["data_loader"], config["batch_size"], block_size=block_size, n=n, input_file=input_file)
-            if config["scheduler"] is not None:
-                if config["variant"] == "standard":
-                    config["scheduler"] = MultiStepLR(config["optimizer"], milestones=config["scheduler"]["milestones"], gamma=config["scheduler"]["gamma"])
-                elif config["variant"] == "low":
-                    config["scheduler"] = NoOpScheduler()
-                elif config["variant"] == "warmup":
-                    config["scheduler"] = get_warmup_scheduler(config["optimizer"], num_warmup_steps=config["scheduler"]["warmup_steps"])
-            else:
-                config["scheduler"] = NoOpScheduler()
-            break
+datasets = dict(
+    mnist=MNIST.MNISTDataLoader,
+    cifar10=CIFAR10.CIFAR10DataLoader,
+    langdata=Langdata.LangDataLoader
+)
 
-    return config
-def get_warmup_scheduler(optimizer, num_warmup_steps=30000):
-    def lr_lambda(current_step):
-        if current_step < num_warmup_steps:
-            return float(current_step) / float(max(1, num_warmup_steps))
-        return 1.0
-    scheduler = LambdaLR(optimizer, lr_lambda)
-    return scheduler
-def get_model(model_name, vocab_size=None, **kwargs):
-    if model_name == 'GPT':
-        device = 'cpu'
-        if torch.cuda.is_available():
-            device = 'cuda'
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            device = 'mps'
-        if vocab_size is None:
-            raise ValueError("Vocab size required for GPT model")
-        return models.GPT.BigramLanguageModel(vocab_size, device=device, **kwargs)
-    elif model_name == "Lenet":
-        return models.Lenet.MNIST_Lenet()
-    elif model_name == "Resnet20":
-        return models.Resnet.Resnet20()
-    
-    print(f"Model not found: {model_name}")
-    raise ValueError("Model not found")
+def get_hyperparams(experiment):
+    if experiment not in config_dict:
+        raise ValueError(f"Experiment {experiment} not found in config.")
+    config = config_dict[experiment]
+    model = config.model
+    if config.optimizer_name == 'adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+    elif config.optimizer_name == 'sgd':
+        optimizer = torch.optim.SGD(model.parameters(), lr=config.lr, momentum=config.momentum)
 
-def get_optimizer(optimizer_name, model, lr):
-    if optimizer_name == 'adam':
-        return torch.optim.Adam(model.parameters(), lr=lr)
-    elif optimizer_name == 'sgd':
-        return torch.optim.SGD(model.parameters(), lr=lr)
-    
-    print(f"Optimizer not found: {optimizer_name}")
-    raise ValueError("Optimizer not found")
+    scheduler = None if config.scheduler is None else LRScheduler(config)
 
-def get_loader(data_loader_name, batch_size, **kwargs):
-    if data_loader_name == 'MNIST':
-        return datasets.MNIST.MNISTDataLoader(batch_size)
-    elif data_loader_name== 'CIFAR10':
-        return datasets.CIFAR10.CIFAR10DataLoader(batch_size)
-    elif data_loader_name == 'Lang':
-        return datasets.Langdata.LangDataLoader(batch_size, kwargs["block_size"], kwargs["n"], kwargs["input_file"])
-    
-    print(f"Data Loader not found: {data_loader_name}")
-    raise ValueError("Data Loader not found")
+    data_loader = datasets[config.dataset](batch_size=config.batch_size)
+
+    return model, optimizer, data_loader, scheduler
 
 @torch.no_grad()
 def estimate_loss(model, dataloader, eval_iter, device, metric='cross_entropy'):
@@ -128,6 +76,23 @@ def interpolate_weights(model1, model2, baseline, alpha, device='cpu'):
 
     interpolated_model.load_state_dict(interpolated_state_dict)
     return interpolated_model
+
+def visualize_interpolation(alphas, error_rates, experiment):
+    error_rates *= 100
+
+    plt.plot(alphas, error_rates[0, :], 'r') # Eval
+    plt.plot(alphas, error_rates[1, :], 'b') # Train
+    plt.legend(['Eval', 'Train'])
+    plt.xlabel('Interpolation')
+    plt.ylabel('Error (%)')
+    plt.ylim(0, 100)
+    plt.title(experiment)
+
+    plt.grid(True)  # Enable both major and minor grid lines
+    plt.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+    plt.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
+    plt.savefig(f"process_imgs/{experiment}_interpolation.png")
+    plt.show()
 
 def save_checkpoint(model, epoch, checkpoint_dir, optimizer=None):
     if not os.path.exists(checkpoint_dir):
