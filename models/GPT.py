@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import inspect
 
 # ----------------- Model Architecture ----------------- #
 # We follow the naming convention of GPT-2 (GPT2LMHeadModel) from HuggingFace
@@ -96,6 +97,24 @@ class GPT(nn.Module):
         )
 
         self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
+        # Weight Sharing Scheme (Vaswani et al. 2017):
+        # "In our model, we share the same weight matrix between the two embedding layers and the pre-softmax
+        # linear transformation, similar to [30]". 
+        self.lm_head.weight = self.transformer.wte.weight
+
+        self.apply(self.init_weights)
+
+    def init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            if module == self.transformer.wte:
+                torch.nn.init.normal_(module.weight, std=0.02)
+            elif module == self.transformer.wpe:
+                torch.nn.init.normal_(module.weight, std=0.01)
+            
 
     def forward(self, x, y=None):
         # Token + Position
