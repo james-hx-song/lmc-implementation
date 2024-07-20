@@ -29,7 +29,7 @@ class Block(nn.Module):
         return out
 
 class Resnet(nn.Module):
-    def __init__(self, initial_features, num_blocks, num_classes=10) -> None:
+    def __init__(self, initial_features=16, num_blocks=[3, 3, 3], num_classes=10) -> None:
         super().__init__()
         self.in_features = initial_features
         self.conv1 = nn.Sequential(
@@ -66,12 +66,10 @@ class Resnet(nn.Module):
             return x, loss
         return x, None
 
-
-def Resnet20():
-    return Resnet(16, [3, 3, 3])
+# Default is Resnet20
 
 
 if __name__ == '__main__':
-    model = Resnet20()
+    model = Resnet()
     print(f"Resnet20 has {sum(p.numel() for p in model.parameters() if p.requires_grad)} parameters.")
 

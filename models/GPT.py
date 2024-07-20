@@ -6,10 +6,10 @@ import torch.nn.functional as F
 # ----------------- Model Architecture ----------------- #
 # We follow the naming convention of GPT-2 (GPT2LMHeadModel) from HuggingFace
 
-# Following the GPT2 Repo (124 M)
+# Default is 124 M GPT 2
 @dataclass
-class GPT2Config:
-    vocab_size: int = 50257 # (Radford et al.)
+class GPTConfig:
+    vocab_size: int = 50257 # (Radford et al. 2020)
     n_embed: int = 768
     block_size: int = 1024
     batch_size: int = 512
@@ -116,13 +116,13 @@ class GPT(nn.Module):
 
 
 if __name__ == '__main__':
-    model = GPT(GPT2Config())
+    model = GPT(GPTConfig())
     
-    # for k, v in model.state_dict().items():
-    #     print(k, v.shape)
+    for k, v in model.state_dict().items():
+        print(k, v.shape)
 
-    x = torch.randint(0, 50257, (2, 1024))
-    y = torch.randint(0, 50257, (2, 1024))
-    # print(x.shape, y.shape)
-    logits, loss = model(x, y)
-    print(logits.shape, loss.item())
+    # x = torch.randint(0, 50257, (2, 1024))
+    # y = torch.randint(0, 50257, (2, 1024))
+    # # print(x.shape, y.shape)
+    # logits, loss = model(x, y)
+    # print(logits.shape, loss.item())
