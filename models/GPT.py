@@ -1,142 +1,89 @@
+from dataclasses import dataclass
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
+import torch.nn.functional as F
 
+# ----------------- Model Architecture ----------------- #
+# We follow the naming convention of GPT-2 (GPT2LMHeadModel) from HuggingFace
 
+# Following the GPT2 Repo (124 M)
+@dataclass
+class GPT2Config:
+    vocab_size: int = 50257 # (Radford et al.)
+    n_embed: int = 768
+    block_size: int = 1024
+    batch_size: int = 512
+    n_layer: int = 12
+    n_head: int = 12
 
-class Head(nn.Module):
-  def __init__(self, head_size, n_embed, block_size, dropout):
-    super().__init__()
+class Attention(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.c_attn = nn.Linear(config.n_embed, config.n_embed*3)
+        self.c_proj = nn.Linear(config.n_embed, config.n_embed)
 
-    self.key = nn.Linear(n_embed, head_size, bias=False)
-    self.query = nn.Linear(n_embed, head_size, bias=False)
-    self.value = nn.Linear(n_embed, head_size, bias=False)
-    self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
-    self.dropout = nn.Dropout(dropout)
+        self.n_head = config.n_head
 
-  def forward(self, x):
-    B, T, C = x.shape
-    k = self.key(x)
-    q = self.query(x)
+        self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size)).view(1, 1, config.block_size, config.block_size))
+    def forward(self, x):
+        B, T, C = x.size()
 
-    # Computing the attention scores
-    wei = q @ k.transpose(-2, -1) * C**(-0.5) # C is the headsize # (B, T, C) @ (B, C, T) -> (B, T, T)
-    wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
-    wei = F.softmax(wei, dim=-1) # (B, T, T)
-    wei = self.dropout(wei)
+        qkv = self.c_attn(x) # (B, T, 3*C)
+        q, k, v = qkv.chunk(3, dim=2) # (B, T, C) x 3
 
-    # Perform the weighted aggregation of the values
-    v = self.value(x) # (B, T, C)
-    out = wei @ v # (B,T, T) @ (B, T, C) -> (B, T, C)
+        # Now we want to split the heads, so # (B, nh, T, hs = C/nh)
+        q = q.view(B, T, self.n_head, C// self.n_head).transpose(1, 2) # (B, T, C) -> (B, nh, T, hs)
+        k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
+        v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
 
-    return out
-  
-class MultiHeadAttention(nn.Module):
-  """ Multiple Heads of self-attention in parallel"""
+        # Scaled dot-product attention: softmax(QK^T / sqrt(d_k)) V
+        head_size = q.size(-1)
+        attn_score = (q @ k.transpose(-2, -1)) * (head_size ** (-0.5)) # (B, nh, T, T)
+        # Decoder-only transformer, so mask the future tokens
+        attn_score = attn_score.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
+        attn_prob = F.softmax(attn_score, dim=-1)
 
-  def __init__(self, num_heads, head_size, n_embed, block_size, dropout) -> None:
-    super().__init__()
-    self.heads = nn.ModuleList([Head(head_size, n_embed, block_size, dropout) for _ in range(num_heads)])
-    # Projection
-    self.proj = nn.Linear(n_embed, n_embed)
-    self.dropout = nn.Dropout(dropout)
+        # Apply the attention to the values
+        attn_vec = attn_prob @ v # (B, nh, T, hs)
+        # Concatenate the heads
+        attn_vec = attn_vec.transpose(1, 2).contiguous().view(B, T, C) # (B, T, C)
 
-  def forward(self, x):
-    return self.dropout(self.proj(torch.cat([h(x) for h in self.heads], dim=-1)))
-  
+        out = self.c_proj(attn_vec) # (B, T, C
 
-class FFN(nn.Module):
-  def __init__(self, n_embed, dropout) -> None:
-    super().__init__()
-    self.layer = nn.Sequential(
-      nn.Linear(n_embed, 4*n_embed),
-      nn.ReLU(),
-      nn.Linear(4*n_embed, n_embed), # Projection Layer
-      nn.Dropout(dropout),
-    )
-  def forward(self, x):
-    return self.layer(x)
-  
+        return out
+
+        
+
 
 class Block(nn.Module):
-  ''' Transformer Block'''
+    def __init__(self, config):
+        super().__init__()
+        self.ln_1 = nn.LayerNorm(config.n_embed)
+        self.ln_2 = nn.LayerNorm(config.n_embed)
+        self.attn = Attention(config)
 
-  def __init__(self, n_embd, n_head, block_size, dropout):
-    # n_embd is the embedding dimension, n_head is the number of heads we'd like
-    super().__init__()
-    self.sa = MultiHeadAttention(n_head, n_embd//n_head, n_embd, block_size, dropout) # Communication
-    self.ffwd = FFN(n_embd, dropout) # Computation
-    self.ln1 = nn.LayerNorm(n_embd)
-    self.ln2 = nn.LayerNorm(n_embd)
 
-  def forward(self, x):
-    # return self.ffwd(self.sa(x))
-    # residual connection
-    x = x + self.sa(self.ln1(x)) # Layer Normalization
-    x = x + self.ffwd(self.ln2(x))
-    return x
-  
+class GPT(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
 
-class BigramLanguageModel(nn.Module):
+        self.transformer = nn.ModuleDict(
+            dict(
+                wte = nn.Embedding(config.vocab_size, config.n_embed), #  Token Embeddings
+                wpe = nn.Embedding(config.block_size, config.n_embed), #  Positional Embeddings
+                h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]) # Transformer Blocks
+            )
+        )
 
-  def __init__(self, vocab_size, **kwargs) -> None:
-    super().__init__()
-    self.vocab_size = vocab_size
-    self.n_embed = kwargs.get('n_embed', 32)
-    self.block_size = kwargs.get('block_size', 8)
-    self.n_head = kwargs.get('n_head', 4)
-    self.n_layers = kwargs.get('n_layers', 4)
-    self.dropout = kwargs.get('dropout', 0.1)
-    self.device = kwargs.get('device', 'cpu')
+        self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
 
-    self.token_embedding_table = nn.Embedding(vocab_size, self.n_embed)
-    # positional embedding
-    self.position_embedding_table = nn.Embedding(self.block_size, self.n_embed) # each position of 0 to block_size-1 will also be embedded
-    self.blocks = nn.Sequential(*[Block(self.n_embed, n_head=self.n_head, block_size=self.block_size, dropout=self.dropout) for _ in range(self.n_layers)])
-    # self.lm_head = nn.Linear(n_embed, vocab_size)
-    # # self.sa_head = Head(n_embed) # Self Attention Head
-    # self.sa_heads = MultiHeadAttention(4, n_embed//4)
-    # # FFN
-    # self.ffn = FFN(n_embed)
-    self.lm_head = nn.Linear(self.n_embed, vocab_size)
 
-  def forward(self, idx, target=None):
-    B, T = idx.shape
-    token_embeddings = self.token_embedding_table(idx) # (B, T, C=n_embed)
-    position_embeddings = self.position_embedding_table(torch.arange(T, device=self.device)) # (T, C=n_embed)
-    x = token_embeddings + position_embeddings # (B, T, C=n_embed)
-    # x = self.sa_heads(x)
-    # x = self.ffn(x)
-    x = self.blocks(x)
-    logits = self.lm_head(x)
-    if target is None:
-      loss = None
-    else:
-       # Note that this is Batch X Time X Channels
-      B, T, C = logits.shape
-      # Negative Log Likelihood Loss
-      pred = logits.view(B*T, C)
-      target = target.view(B*T)
-      loss = F.cross_entropy(pred, target) # Entropy wants it to be batch X time X channels
-    return logits, loss
 
-  def generate(self, idx, max_new_tokens):
-    # idx is (B, T) array of indices in the current context
-    for _ in range(max_new_tokens):
-      # Crop idx to the last block_size tokens
-      idx_cond = idx[:, -self.block_size:]
-      # get the predictions
-      logits, loss = self(idx_cond)
+        
 
-      logits = logits[:, -1, :]
-
-      probs = F.softmax(logits, dim=-1)
-      idx_next = torch.multinomial(probs, num_samples=1)
-      idx = torch.cat((idx, idx_next), dim=1)
-    return idx
-
-if __name__ == "__main__":
-  with open("input.txt", 'r') as f:
-    text = f.read()
-  vocab = list(set(text))
-  print(f"Bigram Language Model has {sum(p.numel() for p in BigramLanguageModel(len(vocab)).parameters() if p.requires_grad)} parameters.")
+if __name__ == '__main__':
+    model = GPT(GPT2Config())
+    
+    for k, v in model.state_dict().items():
+        print(k, v.shape)
