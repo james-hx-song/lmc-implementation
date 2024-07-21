@@ -4,7 +4,7 @@ import copy
 from training_script.utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint, config_dict, visualize_interpolation
 import os
 
-experiment = "cifar_vgg"
+experiment = "mnist_lenet"
 
 device = 'cpu'
 if torch.cuda.is_available():
@@ -32,46 +32,48 @@ print(f"Model: {type(model1).__name__}")
 
 def train():
     torch.autograd.set_detect_anomaly(True)
-    for curr_iter, ((img, target), (img2, target2)) in enumerate(zip(train_loader, train_loader2)):
-        # print(curr_iter)
-        img, img2 = img.to(device), img2.to(device)
-        target, target2 = target.to(device), target2.to(device)
-        t0 = time.time()
-        # Forward Pass
-        logits, loss = model1(img, target=target)
-        optimizer1.zero_grad(set_to_none=True)
-        
-        logits2, loss2 = model2(img2, target=target2)
-        optimizer2.zero_grad(set_to_none=True)
+    curr_iter = 0
+    while curr_iter < max_iter:
+        for (img, target), (img2, target2) in zip(train_loader, train_loader2):
+            # print(curr_iter)
+            img, img2 = img.to(device), img2.to(device)
+            target, target2 = target.to(device), target2.to(device)
+            t0 = time.time()
+            # Forward Pass
+            logits, loss = model1(img, target=target)
+            optimizer1.zero_grad(set_to_none=True)
+            
+            logits2, loss2 = model2(img2, target=target2)
+            optimizer2.zero_grad(set_to_none=True)
 
 
-        # Backward Pass
-        loss.backward()
-        loss2.backward()
+            # Backward Pass
+            loss.backward()
+            loss2.backward()
 
-        # Update LR
-        if scheduler is not None:
-            lr = scheduler.get_lr()
-            for param_group in optimizer1.param_groups:
-                param_group['lr'] = lr
-            for param_group in optimizer2.param_groups:
-                param_group['lr'] = lr
+            # Update LR
+            if scheduler is not None:
+                lr = scheduler.get_lr()
+                for param_group in optimizer1.param_groups:
+                    param_group['lr'] = lr
+                for param_group in optimizer2.param_groups:
+                    param_group['lr'] = lr
 
-        optimizer1.step()
-        optimizer2.step()
-        t1 = time.time()
+            optimizer1.step()
+            optimizer2.step()
+            t1 = time.time()
 
-        # Display Error
-        print(f"Iter: {curr_iter} (Model 1), TrainLoss: {loss.item()}")
-        print(f"Iter: {curr_iter} (Model 2), TrainLoss: {loss2.item()}")
-        if curr_iter % 100 == 0:
-            # Every 100 Iteration, we run an iterated evaluation on the loss to get a better estimate
-            print(f"Iter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
-            print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
-        print(f"Time taken: {t1 - t0}\n")
-        curr_iter += 1
-        if curr_iter >= max_iter:
-            break
+            # Display Error
+            print(f"Iter: {curr_iter} (Model 1), TrainLoss: {loss.item()}")
+            print(f"Iter: {curr_iter} (Model 2), TrainLoss: {loss2.item()}")
+            if curr_iter % 100 == 0:
+                # Every 100 Iteration, we run an iterated evaluation on the loss to get a better estimate
+                print(f"\nIter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
+                print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
+            print(f"Time taken: {t1 - t0}\n")
+            curr_iter += 1
+            if curr_iter >= max_iter:
+                break
 
 # ----------------- Checkpointing ----------------- #
 user_input = input("Do you want to load checkpoints? (y/n): ")
