@@ -91,6 +91,8 @@ else:
 
 # ----------------- Save Model ----------------- #
 
+save_checkpoint(model1, max_iter, experiment + '/model1')
+save_checkpoint(model2, max_iter, experiment + '/model2')
 
 # ----------------- Linear Interpolation ----------------- #
 

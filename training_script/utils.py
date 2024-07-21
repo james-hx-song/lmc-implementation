@@ -83,6 +83,8 @@ def interpolate_weights(model1, model2, baseline, alpha, device='cpu'):
 def visualize_interpolation(alphas, error_rates, experiment):
     error_rates *= 100
 
+    if not os.path.exists("process-imgs"):
+        os.makedirs("process-imgs")
     plt.plot(alphas, error_rates[0, :], 'r') # Eval
     plt.plot(alphas, error_rates[1, :], 'b') # Train
     plt.legend(['Eval', 'Train'])
