@@ -12,29 +12,25 @@ class LRConfig:
 class LRScheduler:
 
     def __init__(self, config):
-        self.count = 0
         self.max_lr = config.max_lr
         self.min_lr = config.min_lr
         self.warmup_steps = config.warmup_steps
         self.max_steps = config.max_steps
 
 
-    def get_lr(self,):
+    def get_lr(self, iters):
         # Linear Warmup
-        if self.count < self.warmup_steps:
-            return self.max_lr * (self.count + 1) / self.warmup_steps
+        if iters < self.warmup_steps:
+            return self.max_lr * (iters + 1) / self.warmup_steps
 
         # min learning rate after decay is over
-        if self.count > self.max_steps:
+        if iters > self.max_steps:
             return self.min_lr
     
         # Cosine Decay
-        decay_ratio = (self.count - self.warmup_steps) / (self.max_steps - self.warmup_steps)
+        decay_ratio = (iters - self.warmup_steps) / (self.max_steps - self.warmup_steps)
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
 
-        self.count += 1
         return self.min_lr + coeff * (self.max_lr - self.min_lr)
     
-    def reset(self):
-        self.count = 0
 

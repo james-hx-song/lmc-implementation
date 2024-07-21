@@ -28,6 +28,8 @@ baseline = copy.deepcopy(model1)
 
 print(f"Model: {type(model1).__name__}")
 
+# if scheduler is not None:
+#     print(f"Config LR: {scheduler.lr}")
 # ----------------- Training Loop ----------------- #
 
 def train():
@@ -53,7 +55,8 @@ def train():
 
             # Update LR
             if scheduler is not None:
-                lr = scheduler.get_lr()
+                lr = scheduler.get_lr(curr_iter)
+                # print(f"{lr:.10f}")
                 for param_group in optimizer1.param_groups:
                     param_group['lr'] = lr
                 for param_group in optimizer2.param_groups:

@@ -56,7 +56,7 @@ for curr_iter, (x, y) in enumerate(train_loader):
     norm = torch.nn.utils.clip_grad_norm_(model1.parameters(), 1.0) # Prevent shocking the optimization
 
     # Update Learning Rate
-    lr = scheduler.get_lr()
+    lr = scheduler.get_lr(curr_iter)
     for param_group in optimizer1.param_groups:
         param_group['lr'] = lr
 
@@ -87,7 +87,7 @@ for curr_iter, (x, y) in enumerate(train_loader2):
     norm = torch.nn.utils.clip_grad_norm_(model2.parameters(), 1.0) # Prevent shocking the optimization
 
     # Update Learning Rate
-    lr = scheduler.get_lr()
+    lr = scheduler.get_lr(curr_iter)
     for param_group in optimizer2.param_groups:
         param_group['lr'] = lr
 

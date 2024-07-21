@@ -6,14 +6,13 @@ class LRScheduler:
         self.milestones = config.scheduler.milestones
 
         self.lr = config.lr
-        self.steps = 0
     
-    def get_lr(self):
+    def get_lr(self, iters):
         # Warmup
-        if self.steps < self.warmup_steps:
-            return self.lr * (self.steps + 1) / self.warmup_steps
+        if iters < self.warmup_steps:
+            return self.lr * (iters + 1) / self.warmup_steps
         
-        if self.steps in self.milestones:
+        if iters in self.milestones:
             self.lr *= self.gamma
 
         return self.lr
