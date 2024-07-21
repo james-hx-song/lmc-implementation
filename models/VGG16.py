@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class VGG16(nn.Module):
-    def __init__(self, num_classes=1000):
+    def __init__(self, num_classes=10):
         super(VGG16, self).__init__()
         self.features = nn.Sequential(
             # First conv block
@@ -46,19 +47,29 @@ class VGG16(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
-        self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, num_classes)
-        )
+        # self.classifier = nn.Sequential(
+        #     nn.Linear(512 * 7 * 7, 4096),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(),
+        #     nn.Linear(4096, 4096),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout(),
+        #     nn.Linear(4096, num_classes)
+        # )
+        self.classifier = nn.Linear(512, num_classes)
 
-    def forward(self, x):
+    def forward(self, x, target=None):
         x = self.features(x)
         x = x.view(x.size(0), -1)  # Flatten the tensor
         x = self.classifier(x)
-        return x
+        if target is not None:
+            loss = F.cross_entropy(x, target)
+            return x, loss
+        return x, None
+    
+
+if __name__ == '__main__':
+    model = VGG16()
+    print(f"VGG16 has {sum(p.numel() for p in model.parameters() if p.requires_grad)} parameters.")
+    
 

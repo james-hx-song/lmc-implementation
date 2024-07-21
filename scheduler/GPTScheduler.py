@@ -34,4 +34,7 @@ class LRScheduler:
 
         self.count += 1
         return self.min_lr + coeff * (self.max_lr - self.min_lr)
+    
+    def reset(self):
+        self.count = 0
 

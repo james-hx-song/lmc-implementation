@@ -11,7 +11,10 @@ config_dict = dict(
     mnist_lenet=config.LeNetConfig(),
     cifar_resnet=config.ResNet20ConfigStandard(),
     cifar_resnet_warmup=config.ResNet20ConfigWarmup(),
-    cifar_resnet_low=config.ResNet20ConfigLow()
+    cifar_resnet_low=config.ResNet20ConfigLow(),
+    cifar_vgg=config.VGG16ConfigStandard(),
+    cifar_vgg_warmup=config.VGG16ConfigWarmup(),
+    cifar_vgg_low=config.VGG16ConfigLow(),
 )
 
 datasets = dict(

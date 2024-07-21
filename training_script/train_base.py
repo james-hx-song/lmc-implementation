@@ -4,7 +4,7 @@ import copy
 from training_script.utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint, config_dict, visualize_interpolation
 import os
 
-experiment = "cifar_resnet"
+experiment = "cifar_vgg"
 
 device = 'cpu'
 if torch.cuda.is_available():
