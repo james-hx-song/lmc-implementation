@@ -5,16 +5,17 @@ from torch.utils.data import Dataset, DataLoader
 class LangDataset(Dataset):
     def __init__(self, block_size, train, n=0.9, input_file="input.txt"):
         with open(input_file, 'r') as f:
-            self.text = f.read()
+            text = f.read()
         self.train = train
-        chars = sorted(list(set(self.text)))
         self.block_size = block_size
-        self.itos = {i:ch for i, ch in enumerate(chars)}
-        self.stoi = {ch:i for i, ch in enumerate(chars)}
 
-        self.data = torch.tensor([self.stoi[c] for c in self.text], dtype=torch.long)
-        self.train_data = self.data[:int(n*len(self.data))]
-        self.val_data = self.data[int(n*len(self.data)):]
+        import tiktoken
+        enc = tiktoken.get_encoding('gpt2') # We use gpt2's tokenizer
+        tokens = enc.encode(text)
+        self.tokens = torch.tensor(tokens)
+
+        self.train_data = self.tokens[:int(n*len(self.tokens))]
+        self.val_data = self.tokens[int(n*len(self.tokens)):]
 
     def __len__(self):
         if self.train:
