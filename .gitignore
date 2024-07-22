@@ -167,6 +167,8 @@ data/
 # Checkpoints
 MNIST_Lenet/
 MinGPT_Shakespeare/
+CIFAR_Resnet/
+CIFAR_VGG/
 
 # Graphs
 *.png

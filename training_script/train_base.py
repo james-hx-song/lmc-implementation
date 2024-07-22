@@ -4,7 +4,7 @@ import copy
 from training_script.utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint, config_dict, visualize_interpolation
 import os
 
-experiment = "mnist_lenet"
+experiment = "cifar_resnet"
 
 device = 'cpu'
 if torch.cuda.is_available():
@@ -31,10 +31,8 @@ print(f"Model: {type(model1).__name__}")
 # if scheduler is not None:
 #     print(f"Config LR: {scheduler.lr}")
 # ----------------- Training Loop ----------------- #
-
-def train():
+def train(curr_iter=0):
     torch.autograd.set_detect_anomaly(True)
-    curr_iter = 0
     while curr_iter < max_iter:
         for (img, target), (img2, target2) in zip(train_loader, train_loader2):
             # print(curr_iter)
@@ -69,8 +67,8 @@ def train():
             # Display Error
             print(f"Iter: {curr_iter} (Model 1), TrainLoss: {loss.item()}")
             print(f"Iter: {curr_iter} (Model 2), TrainLoss: {loss2.item()}")
-            if curr_iter % 100 == 0:
-                # Every 100 Iteration, we run an iterated evaluation on the loss to get a better estimate
+            if curr_iter % 1000 == 0:
+                # Every 1000 Iteration, we run an iterated evaluation on the loss to get a better estimate
                 print(f"\nIter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
                 print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
             print(f"Time taken: {t1 - t0}\n")
@@ -79,25 +77,33 @@ def train():
                 break
 
 # ----------------- Checkpointing ----------------- #
-user_input = input("Do you want to load checkpoints? (y/n): ")
-if not os.path.isdir(experiment) or not os.listdir(experiment) or user_input == 'n':
+if os.path.isdir(experiment) and os.listdir(experiment):
+    print("Checkpoints Found")
+    user_input = input("Do you want to load checkpoints? (y/n): ")
+    if user_input == 'y':
+        print("Loading Checkpoints")
+        model1, optimizer1, curr_iter = load_checkpoint(model1, experiment + '/model1', device=device)
+        model2, optimizer2, _ = load_checkpoint(model2, experiment + '/model2', device=device)
+
+        user_input = input("Do you want to continue training? (y/n): ")
+        if user_input == 'y':
+            print(f"Continuing Training from Iteration {curr_iter}")
+            train(curr_iter)
+            save_checkpoint(model1, max_iter, experiment + '/model1')
+            save_checkpoint(model2, max_iter, experiment + '/model2')
+    else:
+        train()
+        save_checkpoint(model1, max_iter, experiment + '/model1')
+        save_checkpoint(model2, max_iter, experiment + '/model2')
+else:
     train()
     save_checkpoint(model1, max_iter, experiment + '/model1')
     save_checkpoint(model2, max_iter, experiment + '/model2')
-else:
-    print("Loading Checkpoints")
-    model1, optimizer1 = load_checkpoint(model1, experiment + '/model1')
-    model2, optimizer2 = load_checkpoint(model2, experiment + '/model2')
 
-# ----------------- Save Model ----------------- #
-
-save_checkpoint(model1, max_iter, experiment + '/model1')
-save_checkpoint(model2, max_iter, experiment + '/model2')
 
 # ----------------- Linear Interpolation ----------------- #
 
 res = 30 # Resolution of the interpolation
-
 alphas = torch.linspace(0, 1, res)
 error_rates = torch.zeros((2, res))
 

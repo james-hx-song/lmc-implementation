@@ -83,8 +83,8 @@ def interpolate_weights(model1, model2, baseline, alpha, device='cpu'):
 def visualize_interpolation(alphas, error_rates, experiment):
     error_rates *= 100
 
-    if not os.path.exists("process-imgs"):
-        os.makedirs("process-imgs")
+    if not os.path.exists("process_imgs"):
+        os.makedirs("process_imgs")
     plt.plot(alphas, error_rates[0, :], 'r') # Eval
     plt.plot(alphas, error_rates[1, :], 'b') # Train
     plt.legend(['Eval', 'Train'])
@@ -111,17 +111,18 @@ def save_checkpoint(model, epoch, checkpoint_dir, optimizer=None):
     filename = os.path.join(checkpoint_dir, "epoch={}.checkpoint.pth.tar".format(epoch))
     torch.save(checkpoint, filename)
 
-def load_checkpoint(model, checkpoint_dir, optimizer=None):
+def load_checkpoint(model, checkpoint_dir, optimizer=None, device='cpu'):
     checkpoint_files = os.listdir(checkpoint_dir)
     if len(checkpoint_files) == 0:
         return model, optimizer
 
     checkpoint_files = sorted(checkpoint_files)
     last_checkpoint = checkpoint_files[-1]
-    checkpoint = torch.load(os.path.join(checkpoint_dir, last_checkpoint))
+    iterations = int(last_checkpoint.split('=')[1].split('.')[0])
+    checkpoint = torch.load(os.path.join(checkpoint_dir, last_checkpoint), map_location=torch.device(device))
     model.load_state_dict(checkpoint['model'])
 
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer'])
     
-    return model, optimizer
+    return model, optimizer, iterations
