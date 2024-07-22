@@ -69,7 +69,6 @@ for curr_iter, (x, y) in enumerate(train_loader):
     #     f.write(f"Step {i:5} | Loss: {loss_accum:10.6f} | norm: {norm:7.4f} | Time: {t1-t0:6.2f} secs\n")
     print(f"Step {curr_iter:5} | Loss: {loss_accum:10.6f} | norm: {norm:7.4f} | Time: {t1-t0:6.2f} secs")
 
-scheduler.reset()
 
 for curr_iter, (x, y) in enumerate(train_loader2):
     t0 = time.time()

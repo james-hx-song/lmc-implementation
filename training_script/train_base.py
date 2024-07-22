@@ -71,6 +71,9 @@ def train(curr_iter=0):
                 # Every 1000 Iteration, we run an iterated evaluation on the loss to get a better estimate
                 print(f"\nIter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
                 print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
+            if curr_iter % 5000 == 0:
+                save_checkpoint(model1, curr_iter, experiment + '/model1', optimizer1)
+                save_checkpoint(model2, curr_iter, experiment + '/model2', optimizer2)
             print(f"Time taken: {t1 - t0}\n")
             curr_iter += 1
             if curr_iter >= max_iter:
@@ -82,15 +85,15 @@ if os.path.isdir(experiment) and os.listdir(experiment):
     user_input = input("Do you want to load checkpoints? (y/n): ")
     if user_input == 'y':
         print("Loading Checkpoints")
-        model1, optimizer1, curr_iter = load_checkpoint(model1, experiment + '/model1', device=device)
-        model2, optimizer2, _ = load_checkpoint(model2, experiment + '/model2', device=device)
+        model1, optimizer1, curr_iter = load_checkpoint(model1, experiment + '/model1', optimizer1, device=device)
+        model2, optimizer2, _ = load_checkpoint(model2, experiment + '/model2', optimizer2, device=device)
 
         user_input = input("Do you want to continue training? (y/n): ")
         if user_input == 'y':
             print(f"Continuing Training from Iteration {curr_iter}")
             train(curr_iter)
-            save_checkpoint(model1, max_iter, experiment + '/model1')
-            save_checkpoint(model2, max_iter, experiment + '/model2')
+            save_checkpoint(model1, max_iter, experiment + '/model1', optimizer1)
+            save_checkpoint(model2, max_iter, experiment + '/model2', optimizer2)
     else:
         train()
         save_checkpoint(model1, max_iter, experiment + '/model1')
