@@ -8,6 +8,7 @@ import inspect
 # We follow the naming convention of GPT-2 (GPT2LMHeadModel) from HuggingFace
 
 # Default is 124 M GPT 2
+
 @dataclass
 class GPTConfig:
     vocab_size: int = 50257 # (Radford et al. 2020)
@@ -16,6 +17,15 @@ class GPTConfig:
     batch_size: int = 512
     n_layer: int = 12
     n_head: int = 12
+
+@dataclass
+class MinGPTConfig:
+    vocab_size: int = 50257 # (Radford et al. 2020)
+    n_embed: int = 768
+    block_size: int = 256
+    batch_size: int = 16
+    n_layer: int = 5
+    n_head: int = 5
 
 class Attention(nn.Module):
     def __init__(self, config):
@@ -132,13 +142,57 @@ class GPT(nn.Module):
         if y is not None:
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1))
         return logits, loss
+    
+    def generate(self, prefix_tokens, max_len, num_copies, device):
+        prefix_tokens = torch.tensor(prefix_tokens, dtype=torch.long).unsqueeze(0)
+        prefix_tokens = prefix_tokens.repeat(num_copies, 1)
 
+        x = prefix_tokens.to(device)
+        while x.size(1) < max_len:
+            with torch.no_grad():
+                # print(x.shape)
+                logits, _ = self(x)
+                # print(logits.shape)
+
+                logits = logits[:, -1, :] # (B, vocab_size) gets last token
+                
+                proba = F.softmax(logits, dim=-1)
+
+                # Sample from the distribution
+                next_idx = torch.multinomial(proba, num_samples=1)
+
+                x = torch.cat((x, next_idx), dim=1)
+
+        return x.tolist()
 
 if __name__ == '__main__':
+    prompt = "Hello, I am a Large Language Model. "
+    num_copies = 2
+    max_len = 1000
+    device = 'mps'
+
     model = GPT(GPTConfig())
+    model.to(device)
+
+    import tiktoken
+    enc = tiktoken.get_encoding('gpt2')
+    tokens = enc.encode(prompt)
     
-    for k, v in model.state_dict().items():
-        print(k, v.shape)
+    next_tokens = model.generate(tokens, max_len, num_copies, device)
+
+    for i in range(num_copies):
+        tokens = next_tokens[i, :max_len]
+        text = enc.decode(tokens)
+        print(text)
+    
+
+
+    
+    
+
+
+
+
 
     # x = torch.randint(0, 50257, (2, 1024))
     # y = torch.randint(0, 50257, (2, 1024))

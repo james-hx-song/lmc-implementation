@@ -85,8 +85,8 @@ if os.path.isdir(experiment) and os.listdir(experiment):
     user_input = input("Do you want to load checkpoints? (y/n): ")
     if user_input == 'y':
         print("Loading Checkpoints")
-        model1, optimizer1, curr_iter = load_checkpoint(model1, experiment + '/model1', optimizer1, device=device)
-        model2, optimizer2, _ = load_checkpoint(model2, experiment + '/model2', optimizer2, device=device)
+        model1, optimizer1, curr_iter = load_checkpoint(model1, experiment + '/model1', device=device)
+        model2, optimizer2, _ = load_checkpoint(model2, experiment + '/model2', device=device)
 
         user_input = input("Do you want to continue training? (y/n): ")
         if user_input == 'y':
