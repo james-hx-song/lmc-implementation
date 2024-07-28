@@ -2,6 +2,7 @@ import torch
 import os
 import json
 import matplotlib.pyplot as plt
+import random
 
 from datasets import CIFAR10, MNIST, Langdata
 import config.Exp_Config as config
@@ -43,11 +44,12 @@ def get_hyperparams(experiment):
 def estimate_loss(model, dataloader, eval_iter, device, metric='cross_entropy'):
     model.eval()
     losses = torch.zeros(eval_iter, device=device)
-    for i, (img, target) in enumerate(dataloader):
-        if i >= eval_iter:
-            break
+    dataloaderlist = list(dataloader)
+    for i in range(eval_iter):
+        img, target = random.choice(dataloaderlist)
         img = img.to(device)
         target = target.to(device)
+
         logits, loss = model(img, target)
         if metric == 'cross_entropy':
             losses[i] = loss.item()

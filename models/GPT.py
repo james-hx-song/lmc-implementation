@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from training_script.utils import count_parameters
 import inspect
 
 # ----------------- Model Architecture ----------------- #
@@ -10,7 +11,7 @@ import inspect
 # Default is 124 M GPT 2
 
 @dataclass
-class GPTConfig:
+class GPT2Config:
     vocab_size: int = 50257 # (Radford et al. 2020)
     n_embed: int = 768
     block_size: int = 1024
@@ -19,13 +20,23 @@ class GPTConfig:
     n_head: int = 12
 
 @dataclass
-class MinGPTConfig:
-    vocab_size: int = 50257 # (Radford et al. 2020)
-    n_embed: int = 768
+class MinGPTConfig: # GPT 2 Tokenizer
+    vocab_size: int = 50257
+    n_embed: int = 384
     block_size: int = 256
-    batch_size: int = 16
-    n_layer: int = 5
-    n_head: int = 5
+    batch_size: int = 32
+    n_layer: int = 6
+    n_head: int = 6
+
+@dataclass
+class ToyGPTConfig:
+    vocab_size: int = 50257
+    n_embed: int = 32
+    block_size: int = 8
+    batch_size: int = 32
+    n_layer: int = 4
+    n_head: int = 4
+
 
 class Attention(nn.Module):
     def __init__(self, config):
@@ -46,16 +57,16 @@ class Attention(nn.Module):
         q = q.view(B, T, self.n_head, C// self.n_head).transpose(1, 2) # (B, T, C) -> (B, nh, T, hs)
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
-
         # Scaled dot-product attention: softmax(QK^T / sqrt(d_k)) V
-        head_size = q.size(-1)
-        attn_score = (q @ k.transpose(-2, -1)) * (head_size ** (-0.5)) # (B, nh, T, T)
-        # Decoder-only transformer, so mask the future tokens
-        attn_score = attn_score.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
-        attn_prob = F.softmax(attn_score, dim=-1)
 
-        # Apply the attention to the values
-        attn_vec = attn_prob @ v # (B, nh, T, hs)
+        # head_size = q.size(-1)
+        # attn_score = (q @ k.transpose(-2, -1)) * (head_size ** (-0.5)) # (B, nh, T, T)
+        # attn_score = attn_score.masked_fill(self.mask[:, :, :T, :T] == 0, float('-inf'))
+        # attn_prob = F.softmax(attn_score, dim=-1)
+        # attn_vec = attn_prob @ v # (B, nh, T, hs)
+        
+        # Flash attention
+        attn_vec = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         # Concatenate the heads
         attn_vec = attn_vec.transpose(1, 2).contiguous().view(B, T, C) # (B, T, C)
 
@@ -150,52 +161,41 @@ class GPT(nn.Module):
         x = prefix_tokens.to(device)
         while x.size(1) < max_len:
             with torch.no_grad():
-                # print(x.shape)
+                print(x.shape)
                 logits, _ = self(x)
-                # print(logits.shape)
+                print(logits.shape)
 
                 logits = logits[:, -1, :] # (B, vocab_size) gets last token
                 
                 proba = F.softmax(logits, dim=-1)
 
                 # Sample from the distribution
-                next_idx = torch.multinomial(proba, num_samples=1)
+                topk_probs, topk_idx = torch.topk(proba, 50, dim=-1)
+                idx = torch.multinomial(topk_probs, num_samples=1)
+                xcol = torch.gather(topk_idx, 1, idx)
+                x = torch.cat((x, xcol), dim=1)
 
-                x = torch.cat((x, next_idx), dim=1)
-
-        return x.tolist()
+        return x
 
 if __name__ == '__main__':
-    prompt = "Hello, I am a Large Language Model. "
-    num_copies = 2
-    max_len = 1000
-    device = 'mps'
+    model = GPT(ToyGPTConfig())
+    print(count_parameters(model))
+    # prompt = "Hello, I am a Large Language Model. "
+    # num_copies = 2
+    # max_len = 30
+    # device = 'mps'
 
-    model = GPT(GPTConfig())
-    model.to(device)
+    # model = GPT(GPTConfig())
+    # model.to(device)
 
-    import tiktoken
-    enc = tiktoken.get_encoding('gpt2')
-    tokens = enc.encode(prompt)
+    # import tiktoken
+    # enc = tiktoken.get_encoding('gpt2')
+    # tokens = enc.encode(prompt)
     
-    next_tokens = model.generate(tokens, max_len, num_copies, device)
+    # next_tokens = model.generate(tokens, max_len, num_copies, device)
 
-    for i in range(num_copies):
-        tokens = next_tokens[i, :max_len]
-        text = enc.decode(tokens)
-        print(text)
+    # for i in range(num_copies):
+    #     tokens = next_tokens[i, :max_len].tolist()
+    #     text = enc.decode(tokens)
+    #     print(text)
     
-
-
-    
-    
-
-
-
-
-
-    # x = torch.randint(0, 50257, (2, 1024))
-    # y = torch.randint(0, 50257, (2, 1024))
-    # # print(x.shape, y.shape)
-    # logits, loss = model(x, y)
-    # print(logits.shape, loss.item())
