@@ -15,7 +15,7 @@ if torch.cuda.is_available():
 elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
     device = 'mps'
 print(f"Using {device}")
-
+device = 'cpu'
 
 
 # -----------------  Necessary Components: Models, Loaders, Optimizers ----------------- #
