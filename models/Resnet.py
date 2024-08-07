@@ -1,75 +1,81 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class Block(nn.Module):
     def __init__(self, in_channels, out_channels, stride) -> None:
         super().__init__()
 
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False) # With batch norm, no need for bias
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
 
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding='same', bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        # As mentioned in He et al. 2015, we need shortcuts to be of the same dimension as the output
         self.shortcut = nn.Sequential()
-        if stride != 1 or in_channels != out_channels:
+        if stride != 1:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels),
             )
 
-        
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
+        out = F.relu(self.bn2(self.conv2(out)))
         out = out + self.shortcut(x)
         out = F.relu(out)
         return out
 
+# All settings described in Hu et al. 2015
 class Resnet(nn.Module):
-    def __init__(self, initial_features=16, num_blocks=[3, 3, 3], num_classes=10) -> None:
+    def __init__(self, n):
         super().__init__()
-        self.in_features = initial_features
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=initial_features, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(initial_features),
-        )
 
-        self.layer1 = self._make_layer(num_blocks[0], initial_features, 1)
-        self.layer2 = self._make_layer(num_blocks[1], initial_features*2, 2)
-        self.layer3 = self._make_layer(num_blocks[2], initial_features*4, 2)
-        self.fc = nn.Linear(initial_features*4, num_classes) # CIFAR-10
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding='same', bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
 
-    
-    def _make_layer(self, num_blocks, out_channels, stride):
-        layers = [Block(self.in_features, out_channels, stride)]
-        self.in_features = out_channels
-        for _ in range(num_blocks - 1):
-            layers.append(Block(self.in_features, out_channels, 1))
-            self.in_features = out_channels
+        self.in_channels = 16
+        self.layer1 = self._make_layer(n, 16, 1)
+        self.layer2 = self._make_layer(n, 32, 2)
+        self.layer3 = self._make_layer(n, 64, 2)
+
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(64, 10)
+
+    def _make_layer(self, n, out_channels, stride):
+        layers = [Block(self.in_channels, out_channels, stride)]
+        self.in_channels = out_channels
+        for _ in range(n - 1):
+            layers.append(Block(self.in_channels, out_channels, 1))
+            self.in_channels = out_channels
         return nn.Sequential(*layers)
+    
 
     def forward(self, x, target=None):
-        x = F.relu(self.conv1(x))
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = F.adaptive_avg_pool2d(x, (1, 1))
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        x = F.softmax(x, dim=1)
+        out = F.relu(self.bn1(self.conv1(x)))
+
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+
+        out = self.global_avg_pool(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        out = F.softmax(out, dim=1)
 
         if target is not None:
-            loss = F.cross_entropy(x, target)
-            return x, loss
-        return x, None
+            loss = F.cross_entropy(out, target)
+            return out, loss
 
-# Default is Resnet20
+        return out, None
 
+if __name__ == "__main__":
+    # import torch
+    # x = torch.randn(1, 3, 32, 32)
+    model = Resnet(n=3)
 
-if __name__ == '__main__':
-    model = Resnet()
-    print(f"Resnet20 has {sum(p.numel() for p in model.parameters() if p.requires_grad)} parameters.")
+    for name, param in model.named_parameters():
+        print(name, param.size())
+    # y = model(x)
+    print("Resnet 20 has ", sum(p.numel() for p in model.parameters() if p.requires_grad), " parameters")
+
 

@@ -4,11 +4,13 @@ import copy
 from training_script.utils import get_hyperparams, estimate_loss, interpolate_weights, save_checkpoint, load_checkpoint, config_dict, visualize_interpolation
 import os
 
-experiment = "mnist_lenet"
+experiment = "cifar_resnet"
 
 device = 'cpu'
+device_type = 'cpu'
 if torch.cuda.is_available():
     device = 'cuda'
+    device_type = 'cuda'
 elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
     device = 'mps'
 
@@ -32,20 +34,24 @@ print(f"Model: {type(model1).__name__}")
 #     print(f"Config LR: {scheduler.lr}")
 # ----------------- Training Loop ----------------- #
 def train(curr_iter=0):
+    prev_lr = -1
     torch.autograd.set_detect_anomaly(True)
+    # model = torch.compile(model)
     while curr_iter < max_iter:
         for (img, target), (img2, target2) in zip(train_loader, train_loader2):
             # print(curr_iter)
             img, img2 = img.to(device), img2.to(device)
             target, target2 = target.to(device), target2.to(device)
             t0 = time.time()
-            # Forward Pass
-            logits, loss = model1(img, target=target)
+
+            # Set to zero grad
             optimizer1.zero_grad(set_to_none=True)
-            
-            logits2, loss2 = model2(img2, target=target2)
             optimizer2.zero_grad(set_to_none=True)
 
+            # Forward Pass
+            # with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
+            logits, loss = model1(img, target=target)
+            logits2, loss2 = model2(img2, target=target2)
 
             # Backward Pass
             loss.backward()
@@ -54,11 +60,13 @@ def train(curr_iter=0):
             # Update LR
             if scheduler is not None:
                 lr = scheduler.get_lr(curr_iter)
-                # print(f"{lr:.10f}")
-                for param_group in optimizer1.param_groups:
-                    param_group['lr'] = lr
-                for param_group in optimizer2.param_groups:
-                    param_group['lr'] = lr
+                if prev_lr != lr: # Save time
+                    # print(f"{lr:.10f}")
+                    for param_group in optimizer1.param_groups:
+                        param_group['lr'] = lr
+                    for param_group in optimizer2.param_groups:
+                        param_group['lr'] = lr
+                prev_lr = lr
 
             optimizer1.step()
             optimizer2.step()
@@ -71,7 +79,7 @@ def train(curr_iter=0):
                 # Every 1000 Iteration, we run an iterated evaluation on the loss to get a better estimate
                 print(f"\nIter: {curr_iter} (Model 1), TrainLoss: {estimate_loss(model1, train_loader, eval_iter, device)}, EvalLoss: {estimate_loss(model1, test_loader, eval_iter, device)}")
                 print(f"Iter: {curr_iter} (Model 2), TrainLoss: {estimate_loss(model2, train_loader2, eval_iter, device)}, EvalLoss: {estimate_loss(model2, test_loader, eval_iter, device)}")
-            if curr_iter % 5000 == 0:
+            if curr_iter % 2000 == 0:
                 save_checkpoint(model1, curr_iter, experiment + '/model1', optimizer1)
                 save_checkpoint(model2, curr_iter, experiment + '/model2', optimizer2)
             print(f"Time taken: {t1 - t0}\n")

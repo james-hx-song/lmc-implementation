@@ -24,7 +24,7 @@ class LeNetConfig:
 class ResNet20Config:
     # dataset = CIFAR10.CIFAR10DataLoader
     batch_size = 128
-    model = Resnet.Resnet()
+    model = Resnet.Resnet(n=3)
     max_iter = 63e3
     optimizer_name = 'sgd'
     momentum = 0.9
