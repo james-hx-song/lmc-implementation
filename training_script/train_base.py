@@ -19,6 +19,7 @@ print(f"Device: {device}")
 max_iter = config_dict[experiment].max_iter
 model1, optimizer1, data_loader, scheduler = get_hyperparams(experiment)
 model2, optimizer2, data_loader2, _ = get_hyperparams(experiment)
+model2.load_state_dict(model1.state_dict())
 train_loader, train_loader2  = data_loader.get_train_loader(), data_loader2.get_train_loader()
 test_loader = data_loader.get_test_loader()
 
