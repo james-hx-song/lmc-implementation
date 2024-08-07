@@ -171,4 +171,4 @@ CIFAR_Resnet/
 CIFAR_VGG/
 
 # Graphs
-# *.png
+process_imgs/

@@ -49,8 +49,9 @@ def estimate_loss(model, dataloader, eval_iter, device, metric='cross_entropy'):
         img, target = random.choice(dataloaderlist)
         img = img.to(device)
         target = target.to(device)
-
+        print("Forward Pass")
         logits, loss = model(img, target)
+        print("Forward Pass Done")
         if metric == 'cross_entropy':
             losses[i] = loss.item()
         elif metric == 'accuracy':
@@ -113,15 +114,20 @@ def save_checkpoint(model, epoch, checkpoint_dir, optimizer=None):
     filename = os.path.join(checkpoint_dir, "epoch={}.checkpoint.pth.tar".format(epoch))
     torch.save(checkpoint, filename)
 
-def load_checkpoint(model, checkpoint_dir, optimizer=None, device='cpu'):
+def load_checkpoint(model, checkpoint_dir, iterations=None, optimizer=None, device='cpu'):
     checkpoint_files = os.listdir(checkpoint_dir)
     if len(checkpoint_files) == 0:
         return model, optimizer
 
     checkpoint_files = sorted(checkpoint_files)
     last_checkpoint = checkpoint_files[-1]
-    iterations = int(last_checkpoint.split('=')[1].split('.')[0])
-    checkpoint = torch.load(os.path.join(checkpoint_dir, last_checkpoint), map_location=torch.device(device))
+    if iterations is None:
+        iterations = int(last_checkpoint.split('=')[1].split('.')[0])
+    dir = os.path.join(checkpoint_dir, "epoch={}.checkpoint.pth.tar".format(iterations))
+    print(dir)
+    checkpoint = torch.load(dir, map_location=torch.device(device))
+    # for key, value in checkpoint['model'].items():
+    #     print(key)
     model.load_state_dict(checkpoint['model'])
 
     if optimizer is not None:
