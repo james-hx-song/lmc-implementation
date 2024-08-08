@@ -4,6 +4,8 @@ import json
 import matplotlib.pyplot as plt
 import random
 
+from typing import Union
+
 from datasets import CIFAR10, MNIST, Langdata
 import config.Exp_Config as config
 from scheduler.scheduler import LRScheduler
@@ -41,23 +43,39 @@ def get_hyperparams(experiment):
     return model, optimizer, data_loader, scheduler
 
 @torch.no_grad()
-def estimate_loss(model, dataloader, eval_iter, device, metric='cross_entropy'):
+def estimate_loss(model, dataloader, eval_iter: Union[str, int], device, metric='cross_entropy'):
     model.eval()
-    losses = torch.zeros(eval_iter, device=device)
-    dataloaderlist = list(dataloader)
-    for i in range(eval_iter):
-        img, target = random.choice(dataloaderlist)
-        img = img.to(device)
-        target = target.to(device)
-        print("Forward Pass")
-        logits, loss = model(img, target)
-        print("Forward Pass Done")
-        if metric == 'cross_entropy':
-            losses[i] = loss.item()
-        elif metric == 'accuracy':
-            pred = logits.argmax(dim=-1)
-            acc = (pred == target).float().mean()
-            losses[i] = acc.item()
+    losses = torch.zeros(len(dataloader), device=device)
+    if eval_iter == 'all':
+        for i, (img, target) in enumerate(dataloader):
+            img = img.to(device)
+            target = target.to(device)
+            print("Forward Pass")
+            logits, loss = model(img, target)
+            print("Forward Pass Done")
+            if metric == 'cross_entropy':
+                losses[i] = loss.item()
+            elif metric == 'accuracy':
+                pred = logits.argmax(dim=-1)
+                acc = (pred == target).float().mean()
+                losses[i] = acc.item()
+    elif isinstance(eval_iter, int):
+        dataloaderlist = list(dataloader)
+        for i in range(eval_iter):
+            img, target = random.choice(dataloaderlist)
+            img = img.to(device)
+            target = target.to(device)
+            print("Forward Pass")
+            logits, loss = model(img, target)
+            print("Forward Pass Done")
+            if metric == 'cross_entropy':
+                losses[i] = loss.item()
+            elif metric == 'accuracy':
+                pred = logits.argmax(dim=-1)
+                acc = (pred == target).float().mean()
+                losses[i] = acc.item()
+    else:
+        raise ValueError("Invalid eval_iter value. Must be 'all' or an integer.")
     model.train()
     return losses.mean().item()
 
