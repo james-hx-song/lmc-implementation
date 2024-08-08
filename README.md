@@ -13,7 +13,9 @@ Unlike the authors who have trained each network 3 times from random initializat
 
 ## Results
 ![Results](.github/mnist_lenet_interpolation.png)
+
 Lenet result is consistent with the authors' results: the network is stable at initialization.
+
 ![Results](.github/cifar_resnet_interpolation.png)
 Resnet result, for some reason, is not quite consistent; my network is stable at initialization, but the authors suggest otherwise.
 The number of parameters in the Resnet20 I trained is 272K params, which is different from the 274K params specified in the paper.
