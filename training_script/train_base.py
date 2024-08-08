@@ -122,7 +122,7 @@ else:
 res = 30 # Resolution of the interpolation
 alphas = torch.linspace(0, 1, res)
 error_rates = torch.zeros((2, res))
-eval_iter = 'all'
+eval_iter = 1
 for i, alpha in enumerate(alphas):
     interpolated_model = interpolate_weights(model1, model2, baseline, alpha, device=device)
     acc = estimate_loss(interpolated_model, test_loader, eval_iter, device, metric='accuracy')
